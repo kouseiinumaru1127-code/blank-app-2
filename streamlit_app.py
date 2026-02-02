@@ -1,6 +1,5 @@
 import streamlit as st
 from supabase import create_client
-import random
 
 st.set_page_config(page_title="推し診断", page_icon="💖")
 st.title("💖 あなたにぴったりの推し診断")
@@ -25,6 +24,15 @@ if not st.session_state.user_name:
 
 st.write(f"ようこそ、**{st.session_state.user_name}** さん！")
 
+# =========================
+# グループ選択
+# =========================
+groups_resp = supabase.table("idols").select("group_name").execute()
+group_list = sorted(list({row["group_name"] for row in groups_resp.data if row["group_name"]}))
+group_list.insert(0, "全部")
+
+group_choice = st.selectbox("グループを選んでね", group_list)
+
 with st.form("diagnosis_form"):
     st.subheader("Q1. 好きな雰囲気はどっち？")
     q1 = st.radio("雰囲気", ["かわいい", "クール", "元気"], horizontal=True)
@@ -32,7 +40,6 @@ with st.form("diagnosis_form"):
     st.subheader("Q2. 特に重視したいポイントは？")
     q2 = st.radio("魅力", ["ダンス", "歌", "バラエティ"], horizontal=True)
 
-    # 追加質問（点数方式）
     st.subheader("Q3. 休日の過ごし方は？")
     q3 = st.radio("過ごし方", ["のんびり", "アクティブ", "友達と遊ぶ"], horizontal=True)
 
@@ -43,17 +50,15 @@ with st.form("diagnosis_form"):
 
 if submitted:
 
-    # 点数テーブル（ここを好きに変更可能）
+    # -------------------------
+    # 点数計算（type/charm）
+    # -------------------------
     score_type = {"かわいい": 0, "クール": 0, "元気": 0}
     score_charm = {"ダンス": 0, "歌": 0, "バラエティ": 0}
 
-    # Q1
     score_type[q1] += 3
-
-    # Q2
     score_charm[q2] += 3
 
-    # Q3（例：のんびり→かわいい寄り、アクティブ→元気寄り、友達→クール寄り）
     if q3 == "のんびり":
         score_type["かわいい"] += 2
     elif q3 == "アクティブ":
@@ -61,7 +66,6 @@ if submitted:
     else:
         score_type["クール"] += 2
 
-    # Q4（例：スイーツ→かわいい、肉→元気、お寿司→クール）
     if q4 == "スイーツ":
         score_type["かわいい"] += 2
     elif q4 == "お肉":
@@ -69,29 +73,49 @@ if submitted:
     else:
         score_type["クール"] += 2
 
-    # 点数が高いtype/charmを選ぶ
     best_type = max(score_type, key=score_type.get)
     best_charm = max(score_charm, key=score_charm.get)
 
-    # DB検索（最終的に一番近い推しを表示）
-    response = (
-        supabase
-        .table("idols")
-        .select("*")
-        .eq("type", best_type)
-        .eq("charm", best_charm)
-        .execute()
-    )
+    # -------------------------
+    # DB検索（グループ絞り込み）
+    # -------------------------
+    query = supabase.table("idols").select("*")
 
-    if response.data:
+    if group_choice != "全部":
+        query = query.eq("group_name", group_choice)
+
+    resp = query.execute()
+
+    candidates = resp.data or []
+
+    # -------------------------
+    # 候補に一致度スコアを付ける
+    # -------------------------
+    ranked = []
+    for oshi in candidates:
+        score = 0
+        if oshi["type"] == best_type:
+            score += 5
+        if oshi["charm"] == best_charm:
+            score += 5
+        # ここに追加の一致度を増やせる
+        ranked.append((score, oshi))
+
+    ranked.sort(key=lambda x: x[0], reverse=True)
+
+    # -------------------------
+    # 結果表示（ランキング）
+    # -------------------------
+    if ranked and ranked[0][0] > 0:
         st.balloons()
-        st.success("あなたにぴったりの推しが見つかりました！")
+        st.success("ランキング形式で表示します！")
 
-        oshi = random.choice(response.data)
-        st.header(f"✨ {oshi['name']} ✨")
-        st.subheader(f"（{oshi['group_name']}）")
-        if oshi.get("message"):
-            st.write(f"📌 推しポイント：{oshi['message']}")
+        for i, (score, oshi) in enumerate(ranked[:5], start=1):
+            st.write(f"### {i}位：{oshi['name']}（{oshi['group_name']}）")
+            st.write(f"スコア：{score}点")
+            if oshi.get("message"):
+                st.write(f"📌 推しポイント：{oshi['message']}")
+            st.write("---")
 
     else:
         st.error("条件に一致する推しが見つかりませんでした")
