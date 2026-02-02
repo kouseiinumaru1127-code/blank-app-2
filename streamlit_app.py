@@ -1,6 +1,7 @@
 import streamlit as st
 from st_supabase_connection import SupabaseConnection
 import random
+pip install st-supabase-connection streamlit
 
 # ページ設定
 st.set_page_config(page_title="推し診断", page_icon="💖")
