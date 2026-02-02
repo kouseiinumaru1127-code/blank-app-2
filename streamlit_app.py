@@ -1,24 +1,23 @@
 import streamlit as st
-from st_supabase_connection import SupabaseConnection
+from supabase import create_client
 import random
 
 # =========================
 # ページ設定
 # =========================
-st.set_page_config(
-    page_title="推し診断",
-    page_icon="💖"
-)
-
+st.set_page_config(page_title="推し診断", page_icon="💖")
 st.title("💖 あなたにぴったりの推し診断")
 
 # =========================
-# Supabase 接続
+# Supabase 接続（公式）
 # =========================
-conn = st.connection("supabase", type=SupabaseConnection)
+supabase = create_client(
+    st.secrets["supabase"]["url"],
+    st.secrets["supabase"]["key"]
+)
 
 # =========================
-# ログイン（名前入力）
+# 名前入力
 # =========================
 if "user_name" not in st.session_state:
     st.session_state.user_name = ""
@@ -57,31 +56,27 @@ with st.form("diagnosis_form"):
     submitted = st.form_submit_button("運命の推しを見つける！")
 
 # =========================
-# 診断結果
+# 結果表示
 # =========================
 if submitted:
     response = (
-        conn.table("idols")
+        supabase
+        .table("idols")
         .select("*")
         .eq("type", answer_type)
         .eq("charm", answer_charm)
         .execute()
     )
 
-    # デバッグしたいときは有効化
-    # st.write(response.data)
-
-    if response.data and len(response.data) > 0:
+    if response.data:
         st.balloons()
         st.success("あなたにぴったりの推しが見つかりました！")
 
-        # ランダムで1人選ぶ
         oshi = random.choice(response.data)
 
         st.header(f"✨ {oshi['name']} ✨")
         st.subheader(f"（{oshi['group_name']}）")
 
-        # message カラムがあれば表示（無くても落ちない）
         if "message" in oshi and oshi["message"]:
             st.info(f"推しポイント：{oshi['message']}")
 
