@@ -5,14 +5,14 @@ from collections import Counter
 st.set_page_config(page_title="推し診断", page_icon="💖")
 st.title("💖 あなたにぴったりの推し診断")
 
-# ✅ 先にSupabase接続
+# ================= Supabase接続 =================
 supabase = create_client(
     st.secrets["supabase"]["url"],
     st.secrets["supabase"]["key"]
 )
 
+# ================= メニュー =================
 page = st.sidebar.radio("メニュー", ["💖 推し診断", "📊 クラス人気ランキング"])
-
 
 # ================= 名前管理 =================
 if "user_name" not in st.session_state:
@@ -36,22 +36,33 @@ group_list = sorted(list({row["group_name"] for row in groups_resp.data if row["
 group_list.insert(0, "全部")
 group_choice = st.selectbox("グループを選んでね", group_list)
 
-# ================= 診断ページ =================
+# ================= 💖 診断ページ =================
 if page == "💖 推し診断":
 
     with st.form("diagnosis_form"):
-        q1 = st.radio("Q1. 惹かれる雰囲気", ["守ってあげたくなる", "近寄りがたい", "太陽みたい"])
-        q2_style = st.radio("Q2. 見た目の系統", ["かわいい系", "清楚系", "クール系"])
-        q3 = st.radio("Q3. 推しの魅力", ["ダンス", "歌", "バラエティ"])
-        submitted = st.form_submit_button("診断する")
+
+        st.subheader("Q1. どんな雰囲気の人に一番惹かれる？")
+        q1 = st.radio("雰囲気", [
+            "守ってあげたくなる優しい雰囲気",
+            "近寄りがたいけど目が離せない雰囲気",
+            "場を明るくする太陽みたいな雰囲気"
+        ])
+
+        st.subheader("Q2. 見た目の系統で一番好きなのは？")
+        q2_style = st.radio("系統", ["かわいい系", "清楚系", "クール系"])
+
+        st.subheader("Q3. 推しに一番求める魅力は？")
+        q3 = st.radio("魅力", ["ダンス", "歌", "バラエティ"])
+
+        submitted = st.form_submit_button("運命の推しを見つける！")
 
     if submitted:
 
         score_type = {"かわいい": 0, "クール": 0, "元気": 0}
         score_charm = {"ダンス": 0, "歌": 0, "バラエティ": 0}
 
-        if q1 == "守ってあげたくなる": score_type["かわいい"] += 5
-        elif q1 == "近寄りがたい": score_type["クール"] += 5
+        if "守ってあげたくなる" in q1: score_type["かわいい"] += 5
+        elif "近寄りがたい" in q1: score_type["クール"] += 5
         else: score_type["元気"] += 5
 
         if q2_style == "かわいい系": score_type["かわいい"] += 4
@@ -76,36 +87,78 @@ if page == "💖 推し診断":
             score = 0
             if oshi["type"] == best_type: score += 5
             if oshi["charm"] == best_charm: score += 5
+            score += score_type.get(oshi["type"], 0)
+            score += score_charm.get(oshi["charm"], 0)
             ranked.append((score, oshi))
 
         ranked.sort(key=lambda x: x[0], reverse=True)
 
         if ranked:
-            st.success(f"あなたの推しは **{ranked[0][1]['name']}** 💖")
+            st.balloons()
+            st.success("あなたの推しランキング！")
 
-            supabase.table("diagnosis_logs").insert({
-                "user_name": st.session_state.user_name,
-                "top_oshi": ranked[0][1]["name"]
-            }).execute()
+            for i, (score, oshi) in enumerate(ranked[:5], start=1):
+                st.write(f"### {i}位：{oshi['name']}（{oshi['group_name']}）")
+                st.write(f"スコア：{score}点")
+                if oshi.get("message"):
+                    st.write(f"📌 推しポイント：{oshi['message']}")
+                st.write("---")
+
+            # 🔥 ログ保存（超重要）
+            try:
+                supabase.table("diagnosis_logs").insert({
+                    "user_name": st.session_state.user_name,
+                    "top_oshi": ranked[0][1]["name"],
+                    "group_name": ranked[0][1]["group_name"]
+                }).execute()
+            except Exception as e:
+                st.warning("ログ保存失敗")
+                st.text(str(e))
 
             if st.button("🔙 トップに戻る"):
                 st.session_state.user_name = ""
                 st.rerun()
 
-# ================= ランキング =================
+# ================= 📊 ランキングページ =================
 elif page == "📊 クラス人気ランキング":
 
     st.header("📊 クラス人気ランキング")
 
-    logs = supabase.table("diagnosis_logs").select("top_oshi").execute().data
+    logs = supabase.table("diagnosis_logs").select("*").execute().data
 
-    if logs:
-        counts = Counter(log["top_oshi"] for log in logs if log["top_oshi"])
-        ranking = counts.most_common()
+    if not logs:
+        st.info("まだデータがありません")
+        st.stop()
 
-        for i, (name, count) in enumerate(ranking, start=1):
+    # 🏆 全体ランキング
+    st.subheader("🏆 全体ランキング")
+    counts = Counter(log["top_oshi"] for log in logs if log["top_oshi"])
+    ranking = counts.most_common()
+
+    for i, (name, count) in enumerate(ranking, start=1):
+        st.write(f"{i}位：{name}（{count}票）")
+
+    st.bar_chart(dict(ranking))
+    st.markdown("---")
+
+    # 🎤 グループ別ランキング
+    st.subheader("🎤 グループ別ランキング")
+
+    groups = set(log["group_name"] for log in logs if log.get("group_name"))
+
+    for group in groups:
+        st.markdown(f"### 【{group}】")
+        group_logs = [log for log in logs if log.get("group_name") == group]
+        group_counts = Counter(log["top_oshi"] for log in group_logs)
+        group_ranking = group_counts.most_common()
+
+        for i, (name, count) in enumerate(group_ranking, start=1):
             st.write(f"{i}位：{name}（{count}票）")
 
-        st.bar_chart(dict(ranking))
-    else:
-        st.info("まだデータがありません")
+    st.markdown("---")
+
+    # 🧑‍🤝‍🧑 誰が誰推しか
+    st.subheader("🧑‍🤝‍🧑 みんなの推し一覧")
+
+    for log in logs:
+        st.write(f"**{log['user_name']}** → {log['top_oshi']}（{log.get('group_name','?')}）")
