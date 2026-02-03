@@ -131,6 +131,12 @@ if submitted:
             st.write("---")
     else:
         st.error("条件に一致する推しが見つかりませんでした")
+    
+        st.markdown("---")
+
+    if st.button("🔙 トップに戻る"):
+        st.session_state.user_name = ""
+        st.rerun()
 
     # =========================
     # 🔥 ログ保存
