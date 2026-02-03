@@ -7,6 +7,28 @@ st.title("💖 あなたにぴったりの推し診断")
 
 page = st.sidebar.radio("メニュー", ["💖 推し診断", "📊 クラス人気ランキング"])
 
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🛠 管理者用")
+
+if st.sidebar.button("＝LOVEメンバーをDBに追加"):
+    members = [
+        {"name": "大谷映美里", "group_name": "＝LOVE", "type": "かわいい", "charm": "歌", "message": "ファンを魅了するお姉さん！"},
+        {"name": "大場花菜", "group_name": "＝LOVE", "type": "元気", "charm": "バラエティ", "message": "元気で親しみやすいムードメーカー！"},
+        {"name": "音嶋莉沙", "group_name": "＝LOVE", "type": "かわいい", "charm": "ダンス", "message": "ちょっと様子のおかしいお姫様！"},
+        {"name": "齋藤樹愛羅", "group_name": "＝LOVE", "type": "かわいい", "charm": "ダンス", "message": "ふんわりした魅力！"},
+        {"name": "佐々木舞香", "group_name": "＝LOVE", "type": "クール", "charm": "歌", "message": "圧倒的ビジュアルと存在感！"},
+        {"name": "髙松瞳", "group_name": "＝LOVE", "type": "元気", "charm": "バラエティ", "message": "センターの輝き！"},
+        {"name": "瀧脇笙古", "group_name": "＝LOVE", "type": "クール", "charm": "ダンス", "message": "努力姿見てBPMアップ！"},
+        {"name": "野口衣織", "group_name": "＝LOVE", "type": "クール", "charm": "歌", "message": "エネルギッシュ！誰もが沼るずるい人！"},
+        {"name": "諸橋沙夏", "group_name": "＝LOVE", "type": "元気", "charm": "歌", "message": "深みのある歌声！"},
+        {"name": "山本杏奈", "group_name": "＝LOVE", "type": "元気", "charm": "ダンス", "message": "リーダーシップ抜群！"}
+    ]
+
+    for m in members:
+        supabase.table("idols").insert(m).execute()
+
+    st.sidebar.success("追加完了！終わったらこの機能は削除してね！")
+
 supabase = create_client(
     st.secrets["supabase"]["url"],
     st.secrets["supabase"]["key"]
