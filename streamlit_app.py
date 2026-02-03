@@ -163,14 +163,21 @@ if page == "💖 推し診断":
                     st.write(f"📌 推しポイント：{oshi['message']}")
                 st.write("---")
 
-        # ログ保存
-        try:
-            supabase.table("diagnosis_logs").insert({
-                "user_name": st.session_state.user_name,
-                "top_oshi": ranked[0][1]["name"] if ranked else None
-            }).execute()
-        except:
-            pass
+            # ✅ ログ保存
+            try:
+                supabase.table("diagnosis_logs").insert({
+                    "user_name": st.session_state.user_name,
+                    "top_oshi": ranked[0][1]["name"]
+                }).execute()
+            except:
+                pass
+
+            st.markdown("---")
+
+            # 🔙 トップに戻る
+            if st.button("🔙 トップに戻る"):
+                st.session_state.user_name = ""
+                st.rerun()
 
 # ================= 📊 ランキング =================
 elif page == "📊 クラス人気ランキング":
