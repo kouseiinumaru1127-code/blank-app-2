@@ -5,12 +5,20 @@ from collections import Counter
 st.set_page_config(page_title="推し診断", page_icon="💖")
 st.title("💖 あなたにぴったりの推し診断")
 
+# ✅ 先にSupabase接続
+supabase = create_client(
+    st.secrets["supabase"]["url"],
+    st.secrets["supabase"]["key"]
+)
+
 page = st.sidebar.radio("メニュー", ["💖 推し診断", "📊 クラス人気ランキング"])
 
+# ================= 管理者用追加 =================
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🛠 管理者用")
 
-if st.sidebar.button("＝LOVEメンバーをDBに追加"):
+if st.sidebar.button("＝LOVEメンバーをDBに追加（1回だけ押して！）"):
+
     members = [
         {"name": "大谷映美里", "group_name": "＝LOVE", "type": "かわいい", "charm": "歌", "message": "ファンを魅了するお姉さん！"},
         {"name": "大場花菜", "group_name": "＝LOVE", "type": "元気", "charm": "バラエティ", "message": "元気で親しみやすいムードメーカー！"},
@@ -19,20 +27,18 @@ if st.sidebar.button("＝LOVEメンバーをDBに追加"):
         {"name": "佐々木舞香", "group_name": "＝LOVE", "type": "クール", "charm": "歌", "message": "圧倒的ビジュアルと存在感！"},
         {"name": "髙松瞳", "group_name": "＝LOVE", "type": "元気", "charm": "バラエティ", "message": "センターの輝き！"},
         {"name": "瀧脇笙古", "group_name": "＝LOVE", "type": "クール", "charm": "ダンス", "message": "努力姿見てBPMアップ！"},
-        {"name": "野口衣織", "group_name": "＝LOVE", "type": "クール", "charm": "歌", "message": "エネルギッシュ！誰もが沼るずるい人！"},
+        {"name": "野口衣織", "group_name": "＝LOVE", "type": "クール", "charm": "歌", "message": "誰もが沼るずるい人！"},
         {"name": "諸橋沙夏", "group_name": "＝LOVE", "type": "元気", "charm": "歌", "message": "深みのある歌声！"},
         {"name": "山本杏奈", "group_name": "＝LOVE", "type": "元気", "charm": "ダンス", "message": "リーダーシップ抜群！"}
     ]
 
     for m in members:
-        supabase.table("idols").insert(m).execute()
+        # 同じ名前が既にいるかチェック（増殖防止）
+        exists = supabase.table("idols").select("id").eq("name", m["name"]).execute().data
+        if not exists:
+            supabase.table("idols").insert(m).execute()
 
-    st.sidebar.success("追加完了！終わったらこの機能は削除してね！")
-
-supabase = create_client(
-    st.secrets["supabase"]["url"],
-    st.secrets["supabase"]["key"]
-)
+    st.sidebar.success("追加完了！この機能は後で削除してOK！")
 
 # ================= 名前管理 =================
 if "user_name" not in st.session_state:
@@ -56,56 +62,22 @@ group_list = sorted(list({row["group_name"] for row in groups_resp.data if row["
 group_list.insert(0, "全部")
 group_choice = st.selectbox("グループを選んでね", group_list)
 
-# ================= 💖 診断ページ =================
+# ================= 診断ページ =================
 if page == "💖 推し診断":
 
     with st.form("diagnosis_form"):
+        q1 = st.radio("Q1. 惹かれる雰囲気", ["守ってあげたくなる", "近寄りがたい", "太陽みたい"])
+        q2_style = st.radio("Q2. 見た目の系統", ["かわいい系", "清楚系", "クール系"])
+        q3 = st.radio("Q3. 推しの魅力", ["ダンス", "歌", "バラエティ"])
+        submitted = st.form_submit_button("診断する")
 
-        st.subheader("Q1. どんな雰囲気の人に一番惹かれる？")
-        q1 = st.radio("雰囲気", [
-            "守ってあげたくなる優しい雰囲気",
-            "近寄りがたいけど目が離せない雰囲気",
-            "場を明るくする太陽みたいな雰囲気"
-        ])
-
-        st.subheader("Q2. 見た目の系統で一番好きなのは？")
-        q2_style = st.radio("系統", ["かわいい系", "清楚系", "クール系"])
-
-        st.subheader("Q3. 推しに一番求める魅力は？")
-        q3 = st.radio("魅力", ["ダンス", "歌", "バラエティ"])
-
-        st.subheader("Q4. ギャップのある人どう思う？")
-        q4 = st.radio("ギャップ", ["大好物", "ちょっと好き", "安定がいい"])
-
-        st.subheader("Q5. 推しに求めるポジションは？")
-        q5 = st.radio("ポジション", ["センター", "支える人", "ムードメーカー"])
-
-        st.subheader("Q6. 推しを見るとき一番テンション上がる瞬間は？")
-        q6 = st.radio("瞬間", ["パフォーマンス中", "素の笑顔", "面白いことしてる時"])
-
-        st.subheader("Q7. 推しとの理想の距離感は？")
-        q7 = st.radio("距離感", ["近くに感じたい", "遠くから憧れたい", "友達みたいがいい"])
-
-        st.subheader("Q8. 夜中に見たくなる推しはどれ？")
-        q8 = st.radio("深夜タイプ", ["癒してくれる人", "かっこよすぎる人", "元気をくれる人"])
-
-        st.subheader("Q9. 推しに言われたい言葉は？")
-        q9 = st.radio("言葉", ["いつも頑張ってるね", "ついてこいよ", "一緒に楽しもう！"])
-
-        st.subheader("Q10. グループで目で追っちゃうのは？")
-        q10 = st.radio("目で追う人", ["控えめな人", "オーラある人", "騒いでる人"])
-
-        submitted = st.form_submit_button("運命の推しを見つける！")
-
-    # ================= 診断ロジック =================
     if submitted:
 
         score_type = {"かわいい": 0, "クール": 0, "元気": 0}
         score_charm = {"ダンス": 0, "歌": 0, "バラエティ": 0}
 
-        # 強い軸
-        if "守ってあげたくなる" in q1: score_type["かわいい"] += 5
-        elif "近寄りがたい" in q1: score_type["クール"] += 5
+        if q1 == "守ってあげたくなる": score_type["かわいい"] += 5
+        elif q1 == "近寄りがたい": score_type["クール"] += 5
         else: score_type["元気"] += 5
 
         if q2_style == "かわいい系": score_type["かわいい"] += 4
@@ -116,46 +88,9 @@ if page == "💖 推し診断":
 
         score_charm[q3] += 4
 
-        # 補助軸
-        if q4 == "大好物":
-            score_type["クール"] += 2
-            score_charm["バラエティ"] += 2
-        elif q4 == "安定がいい":
-            score_type["かわいい"] += 2
-
-        if q5 == "センター": score_type["クール"] += 2
-        elif q5 == "支える人": score_type["かわいい"] += 2
-        else: score_type["元気"] += 2
-
-        if q6 == "パフォーマンス中":
-            score_charm["ダンス"] += 2
-            score_charm["歌"] += 1
-        elif q6 == "素の笑顔":
-            score_type["かわいい"] += 2
-        else:
-            score_type["元気"] += 2
-            score_charm["バラエティ"] += 1
-
-        if q7 == "近くに感じたい": score_type["かわいい"] += 2
-        elif q7 == "遠くから憧れたい": score_type["クール"] += 2
-        else: score_type["元気"] += 2
-
-        if q8 == "癒してくれる人": score_type["かわいい"] += 2
-        elif q8 == "かっこよすぎる人": score_type["クール"] += 2
-        else: score_type["元気"] += 2
-
-        if q9 == "いつも頑張ってるね": score_type["かわいい"] += 2
-        elif q9 == "ついてこいよ": score_type["クール"] += 2
-        else: score_type["元気"] += 2
-
-        if q10 == "控えめな人": score_type["かわいい"] += 2
-        elif q10 == "オーラある人": score_type["クール"] += 2
-        else: score_type["元気"] += 2
-
         best_type = max(score_type, key=score_type.get)
         best_charm = max(score_charm, key=score_charm.get)
 
-        # DB検索
         query = supabase.table("idols").select("*")
         if group_choice != "全部":
             query = query.eq("group_name", group_choice)
@@ -167,41 +102,23 @@ if page == "💖 推し診断":
             score = 0
             if oshi["type"] == best_type: score += 5
             if oshi["charm"] == best_charm: score += 5
-            score += score_type.get(oshi["type"], 0)
-            score += score_charm.get(oshi["charm"], 0)
             ranked.append((score, oshi))
 
         ranked.sort(key=lambda x: x[0], reverse=True)
 
-        # 結果表示
         if ranked:
-            st.balloons()
-            st.success("ランキング形式で表示します！")
+            st.success(f"あなたの推しは **{ranked[0][1]['name']}** 💖")
 
-            for i, (score, oshi) in enumerate(ranked[:5], start=1):
-                st.write(f"### {i}位：{oshi['name']}（{oshi['group_name']}）")
-                st.write(f"スコア：{score}点")
-                if oshi.get("message"):
-                    st.write(f"📌 推しポイント：{oshi['message']}")
-                st.write("---")
+            supabase.table("diagnosis_logs").insert({
+                "user_name": st.session_state.user_name,
+                "top_oshi": ranked[0][1]["name"]
+            }).execute()
 
-            # ✅ ログ保存
-            try:
-                supabase.table("diagnosis_logs").insert({
-                    "user_name": st.session_state.user_name,
-                    "top_oshi": ranked[0][1]["name"]
-                }).execute()
-            except:
-                pass
-
-            st.markdown("---")
-
-            # 🔙 トップに戻る
             if st.button("🔙 トップに戻る"):
                 st.session_state.user_name = ""
                 st.rerun()
 
-# ================= 📊 ランキング =================
+# ================= ランキング =================
 elif page == "📊 クラス人気ランキング":
 
     st.header("📊 クラス人気ランキング")
@@ -213,7 +130,7 @@ elif page == "📊 クラス人気ランキング":
         ranking = counts.most_common()
 
         for i, (name, count) in enumerate(ranking, start=1):
-            st.write(f"### {i}位：{name}（{count}票）")
+            st.write(f"{i}位：{name}（{count}票）")
 
         st.bar_chart(dict(ranking))
     else:
