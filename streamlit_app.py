@@ -27,7 +27,6 @@ if "user_name" not in st.session_state:
 # =========================
 if page == "💖 推し診断":
 
-    # --- 名前入力 ---
     if not st.session_state.user_name:
         st.warning("まずは名前を入力してください")
         name_input = st.text_input("あなたの名前")
@@ -40,26 +39,35 @@ if page == "💖 推し診断":
 
     st.write(f"ようこそ、**{st.session_state.user_name}** さん！")
 
-    # --- グループ選択 ---
+    # グループ選択
     groups_resp = supabase.table("idols").select("group_name").execute()
     group_list = sorted(list({row["group_name"] for row in groups_resp.data if row["group_name"]}))
     group_list.insert(0, "全部")
-
     group_choice = st.selectbox("グループを選んでね", group_list)
 
-    # --- 診断フォーム ---
+    # =========================
+    # 診断フォーム（改良版）
+    # =========================
     with st.form("diagnosis_form"):
-        st.subheader("Q1. 好きな雰囲気はどっち？")
-        q1 = st.radio("雰囲気", ["かわいい", "クール", "元気"], horizontal=True)
 
-        st.subheader("Q2. 特に重視したいポイントは？")
-        q2 = st.radio("魅力", ["ダンス", "歌", "バラエティ"], horizontal=True)
+        st.subheader("Q1. どんな雰囲気の人に一番惹かれる？")
+        q1 = st.radio(
+            "雰囲気",
+            [
+                "守ってあげたくなる優しい雰囲気",
+                "近寄りがたいけど目が離せない雰囲気",
+                "場を明るくする太陽みたいな雰囲気"
+            ]
+        )
 
-        st.subheader("Q3. 休日の過ごし方は？")
-        q3 = st.radio("過ごし方", ["のんびり", "アクティブ", "友達と遊ぶ"], horizontal=True)
+        st.subheader("Q2. 推しに一番求める魅力は？")
+        q2 = st.radio("魅力", ["ダンス", "歌", "バラエティ"])
 
-        st.subheader("Q4. 好きな食べ物は？")
-        q4 = st.radio("食べ物", ["スイーツ", "お肉", "お寿司"], horizontal=True)
+        st.subheader("Q3. ギャップのある人どう思う？")
+        q3 = st.radio("ギャップ", ["大好物", "ちょっと好き", "安定がいい"])
+
+        st.subheader("Q4. 推しに求めるポジションは？")
+        q4 = st.radio("ポジション", ["センター", "支える人", "ムードメーカー"])
 
         submitted = st.form_submit_button("運命の推しを見つける！")
 
@@ -71,25 +79,33 @@ if page == "💖 推し診断":
         score_type = {"かわいい": 0, "クール": 0, "元気": 0}
         score_charm = {"ダンス": 0, "歌": 0, "バラエティ": 0}
 
-        score_type[q1] += 5
+        # Q1 雰囲気（最重要）
+        if "守ってあげたくなる" in q1:
+            score_type["かわいい"] += 5
+        elif "近寄りがたい" in q1:
+            score_type["クール"] += 5
+        else:
+            score_type["元気"] += 5
+
+        # Q2 魅力
         score_charm[q2] += 4
 
-        if q3 == "のんびり":
-            score_type["かわいい"] += 2
-            score_type["クール"] += 1
-        elif q3 == "アクティブ":
-            score_type["元気"] += 2
-            score_charm["ダンス"] += 1
-        else:
+        # Q3 ギャップ耐性
+        if q3 == "大好物":
             score_type["クール"] += 2
-            score_charm["バラエティ"] += 1
+            score_charm["バラエティ"] += 2
+        elif q3 == "ちょっと好き":
+            score_type["元気"] += 1
+        else:
+            score_type["かわいい"] += 2
 
-        if q4 == "スイーツ":
-            score_type["かわいい"] += 2
-        elif q4 == "お肉":
-            score_type["元気"] += 2
-        else:
+        # Q4 ポジション
+        if q4 == "センター":
             score_type["クール"] += 2
+        elif q4 == "支える人":
+            score_type["かわいい"] += 2
+        else:
+            score_type["元気"] += 2
 
         best_type = max(score_type, key=score_type.get)
         best_charm = max(score_charm, key=score_charm.get)
